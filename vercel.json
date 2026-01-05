@@ -1,8 +1,23 @@
 {
+  "version": 2,
   "functions": {
-    "api/heroes.js": {
+    "api/**/*.js": {
       "memory": 1024,
       "maxDuration": 10
     }
-  }
+  },
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ]
 }
+```
+
+**2. Create `.npmrc`** (new file):
+```
+legacy-peer-deps=true
+engine-strict=false
+audit=false
+fund=false
