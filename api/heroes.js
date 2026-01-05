@@ -1,14 +1,9 @@
-// api/heroes.js - Vercel Serverless Function using Fantasy.top SDK
-// Save this file as: api/heroes.js
-
-// Import the Fantasy.top SDK
-import { Client, Configuration } from '@fantasy-top/sdk-pro';
+// api/heroes.js - Direct API calls without SDK
 
 const FANTASY_API_KEY = 'f341037c-8d9a-476a-9a10-9c484e4cb01f';
-const FANTASY_API_BASE = 'https://api-v2.fantasy.top';
+const API_BASE = 'https://api-v2.fantasy.top';
 
 export default async function handler(req, res) {
-  // Enable CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,27 +13,72 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('Initializing Fantasy.top SDK...');
+    console.log('Fetching from Fantasy.top API...');
     
-    // Initialize the SDK
-    const config = new Configuration({
-      basePath: FANTASY_API_BASE,
-      apiKey: FANTASY_API_KEY
-    });
+    // Try multiple possible endpoints with different methods
+    const endpoints = [
+      { url: `${API_BASE}/card/findAllCards?page=1&limit=200`, method: 'GET' },
+      { url: `${API_BASE}/cards?page=1&limit=200`, method: 'GET' },
+      { url: `${API_BASE}/api/card/findAllCards`, method: 'GET' },
+      { url: `${API_BASE}/api/cards/all`, method: 'GET' },
+    ];
     
-    const api = Client.getInstance(config);
+    let data = null;
+    let successEndpoint = null;
+    let lastError = null;
     
-    console.log('Fetching cards from Fantasy.top...');
+    for (const endpoint of endpoints) {
+      try {
+        console.log(`Trying: ${endpoint.method} ${endpoint.url}`);
+        
+        const response = await fetch(endpoint.url, {
+          method: endpoint.method,
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': FANTASY_API_KEY,
+            'Authorization': `Bearer ${FANTASY_API_KEY}`
+          }
+        });
+        
+        console.log(`Response status: ${response.status}`);
+        
+        if (response.ok) {
+          data = await response.json();
+          successEndpoint = endpoint.url;
+          console.log('Success!');
+          break;
+        } else {
+          const errorText = await response.text();
+          console.log(`Failed: ${response.status} - ${errorText}`);
+          lastError = `${response.status}: ${errorText}`;
+        }
+      } catch (err) {
+        console.log(`Error: ${err.message}`);
+        lastError = err.message;
+        continue;
+      }
+    }
     
-    // Use the SDK method to get all cards
-    const cardsData = await api.card.findAllCards(1, 200); // page 1, limit 200
+    if (!data) {
+      throw new Error(`All endpoints failed. Last error: ${lastError}. The API might require different authentication or the SDK must be used.`);
+    }
     
-    console.log('Successfully fetched data');
-
-    // Process the data
+    console.log('Processing data...');
+    
+    // Process the response
     const heroMap = new Map();
-    const cards = cardsData.data || cardsData.cards || [];
-
+    const cards = data.data || data.cards || data.results || data || [];
+    
+    if (!Array.isArray(cards)) {
+      return res.status(200).json({
+        success: true,
+        debug: true,
+        message: 'Got response but not in expected array format',
+        endpoint: successEndpoint,
+        rawData: data
+      });
+    }
+    
     cards.forEach(card => {
       const heroId = card.playerId || card.player_id || card.id;
       const heroName = card.playerName || card.player_name || card.name;
@@ -66,27 +106,29 @@ export default async function handler(req, res) {
         hero.prices[rarity] = price;
       }
     });
-
+    
     const heroes = Array.from(heroMap.values())
       .filter(hero => Object.keys(hero.prices).length > 0)
       .map(hero => ({
         ...hero,
         commonPrice: hero.prices.common || Math.min(...Object.values(hero.prices))
       }));
-
+    
     res.status(200).json({
       success: true,
       count: heroes.length,
+      endpoint: successEndpoint,
       heroes: heroes
     });
-
+    
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Final error:', error);
     
     res.status(500).json({
       success: false,
       error: error.message,
-      message: 'Failed to fetch data. SDK error.'
+      message: 'Failed to fetch data from Fantasy.top API',
+      suggestion: 'The API might require the SDK to be run client-side, or needs different authentication'
     });
   }
 }
