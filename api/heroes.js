@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch 5 pages in parallel to get all heroes
+    // Fetch 5 pages in parallel
     const promises = [];
     for (let page = 1; page <= 5; page++) {
       promises.push(api.card.findAllCards({ page, limit: 200 }));
@@ -44,8 +44,13 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Skip heroes with 0 expected score (inactive/removed)
+      // Filter criteria to match Fantasy.top leaderboard:
+      // 1. Must have expected score > 0
+      // 2. Must have status = "HERO" (active hero)
+      // 3. Must be packable (can_be_packed = true)
       if (expectedScore === 0) continue;
+      if (hero.status !== 'HERO') continue;
+      if (hero.can_be_packed === false) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -55,7 +60,8 @@ export default async function handler(req, res) {
           stars: hero.stars || 0,
           followers: hero.followers_count || 0,
           expectedScore: expectedScore,
-          profileImage: hero.profile_image_url_https || null
+          profileImage: hero.profile_image_url_https || null,
+          status: hero.status
         });
       }
     }
@@ -66,7 +72,6 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      activeHeroes: heroes.length,
       heroes: heroes
     });
     
