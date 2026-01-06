@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch 5 pages to get all heroes
+    // Fetch 5 pages in parallel to get all heroes
     const promises = [];
     for (let page = 1; page <= 5; page++) {
       promises.push(api.card.findAllCards({ page, limit: 200 }));
@@ -42,6 +42,10 @@ export default async function handler(req, res) {
       
       const hero = card.heroes;
       const heroId = String(hero.id);
+      const expectedScore = parseFloat(hero.expected_score) || 0;
+      
+      // Skip heroes with 0 expected score (inactive/removed)
+      if (expectedScore === 0) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -50,7 +54,7 @@ export default async function handler(req, res) {
           handle: hero.handle || null,
           stars: hero.stars || 0,
           followers: hero.followers_count || 0,
-          expectedScore: parseFloat(hero.expected_score) || 0,
+          expectedScore: expectedScore,
           profileImage: hero.profile_image_url_https || null
         });
       }
@@ -62,6 +66,7 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
+      activeHeroes: heroes.length,
       heroes: heroes
     });
     
