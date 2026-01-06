@@ -1,5 +1,8 @@
 {
   "name": "fantasy-top-backend",
   "version": "1.0.0",
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@fantasy-top/sdk-pro": "latest"
+  }
 }
