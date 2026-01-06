@@ -1,4 +1,4 @@
-// api/heroes.js - Check what's inside result.data
+// api/heroes.js - Working version with correct path
 import { Client, Configuration } from '@fantasy-top/sdk-pro';
 
 const config = new Configuration({
@@ -26,29 +26,69 @@ export default async function handler(req, res) {
     
     const result = await api.card.findAllCards({ page: 1, limit: 200 });
     
-    // Check what's inside result.data
-    const dataObj = result.data;
+    // Cards are at result.data.data
+    const cards = result.data.data || [];
     
-    return res.status(200).json({
+    console.log(`Found ${cards.length} cards`);
+    
+    if (!Array.isArray(cards) || cards.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        message: 'No cards found',
+        heroes: []
+      });
+    }
+    
+    // Process the cards into hero data
+    const heroMap = new Map();
+    
+    cards.forEach(card => {
+      try {
+        const heroId = card.playerId || card.player_id || card.id;
+        const heroName = card.playerName || card.player_name || card.name;
+        
+        if (!heroId || !heroName) return;
+        
+        if (!heroMap.has(heroId)) {
+          heroMap.set(heroId, {
+            id: heroId,
+            name: heroName,
+            handle: card.playerHandle || card.twitter_handle || card.handle || null,
+            stars: card.stars || card.rating || null,
+            rank: card.rank || card.position || null,
+            followers: card.followers || card.follower_count || null,
+            score7d: card.score7d || card.weekly_score || card.score || null,
+            prices: {}
+          });
+        }
+        
+        const hero = heroMap.get(heroId);
+        const rarity = (card.rarity || card.tier || '').toLowerCase();
+        const price = parseFloat(card.price || card.floor_price || 0);
+        
+        if (rarity && price > 0) {
+          hero.prices[rarity] = price;
+        }
+      } catch (err) {
+        console.error('Error processing card:', err.message);
+      }
+    });
+    
+    const heroes = Array.from(heroMap.values())
+      .filter(hero => Object.keys(hero.prices).length > 0)
+      .map(hero => ({
+        ...hero,
+        commonPrice: hero.prices.common || Math.min(...Object.values(hero.prices))
+      }));
+    
+    console.log(`Processed ${heroes.length} heroes`);
+    
+    res.status(200).json({
       success: true,
-      debug: true,
-      message: 'Showing result.data contents',
-      dataKeys: dataObj ? Object.keys(dataObj) : null,
-      dataType: typeof dataObj,
-      // Show the actual structure
-      dataStructure: {
-        hasItems: 'items' in dataObj,
-        hasCards: 'cards' in dataObj,
-        hasData: 'data' in dataObj,
-        hasResults: 'results' in dataObj,
-        hasRows: 'rows' in dataObj,
-        itemsLength: dataObj.items?.length || 0,
-        cardsLength: dataObj.cards?.length || 0,
-        dataLength: dataObj.data?.length || 0,
-        resultsLength: dataObj.results?.length || 0
-      },
-      // Show first few keys of dataObj for inspection
-      fullDataKeys: dataObj ? Object.keys(dataObj).slice(0, 20) : null
+      count: heroes.length,
+      totalCards: cards.length,
+      heroes: heroes
     });
     
   } catch (error) {
@@ -56,7 +96,8 @@ export default async function handler(req, res) {
     
     res.status(500).json({
       success: false,
-      error: error.message
+      error: error.message,
+      message: 'Failed to fetch data from Fantasy.top API'
     });
   }
 }
