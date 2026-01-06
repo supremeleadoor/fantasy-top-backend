@@ -8,7 +8,6 @@ const config = new Configuration({
 const api = Client.getInstance(config);
 
 export default async function handler(req, res) {
-  // Enhanced CORS headers
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -24,27 +23,45 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await api.card.findAllCards({ page: 1, limit: 200 });
-    const cards = result.data.data || [];
-    
     const heroMap = new Map();
+    const TARGET_HEROES = 185;
+    const MAX_PAGES = 10;
+    let page = 1;
+    let totalCards = 0;
     
-    for (const card of cards) {
-      if (!card || !card.heroes || !card.heroes.id) continue;
-      
-      const hero = card.heroes;
-      const heroId = String(hero.id);
-      
-      if (!heroMap.has(heroId)) {
-        heroMap.set(heroId, {
-          id: heroId,
-          name: hero.name || 'Unknown',
-          handle: hero.handle || null,
-          stars: hero.stars || 0,
-          followers: hero.followers_count || 0,
-          expectedScore: parseFloat(hero.expected_score) || 0,
-          profileImage: hero.profile_image_url_https || null
-        });
+    while (heroMap.size < TARGET_HEROES && page <= MAX_PAGES) {
+      try {
+        const result = await api.card.findAllCards({ page, limit: 200 });
+        const cards = result.data.data || [];
+        
+        if (cards.length === 0) break;
+        
+        totalCards += cards.length;
+        
+        for (const card of cards) {
+          if (!card || !card.heroes || !card.heroes.id) continue;
+          
+          const hero = card.heroes;
+          const heroId = String(hero.id);
+          
+          if (!heroMap.has(heroId)) {
+            heroMap.set(heroId, {
+              id: heroId,
+              name: hero.name || 'Unknown',
+              handle: hero.handle || null,
+              stars: hero.stars || 0,
+              followers: hero.followers_count || 0,
+              expectedScore: parseFloat(hero.expected_score) || 0,
+              profileImage: hero.profile_image_url_https || null
+            });
+          }
+        }
+        
+        if (cards.length < 200) break;
+        page++;
+        
+      } catch (pageError) {
+        break;
       }
     }
     
@@ -53,6 +70,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       count: heroes.length,
+      totalCards: totalCards,
       heroes: heroes
     });
     
