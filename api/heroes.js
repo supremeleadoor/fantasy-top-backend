@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     console.log('Fetching from Fantasy.top API using SDK...');
     
     // Use SDK to fetch all cards
-    const result = await api.card.findAllCards(1, 200);
+    const result = await api.card.findAllCards({ page: 1, limit: 200 });
     
     console.log('Processing data...');
     
@@ -94,3 +94,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
