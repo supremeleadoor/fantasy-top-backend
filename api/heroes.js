@@ -21,24 +21,23 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch 10 pages to ensure we get all active heroes
-    const promises = [];
-    for (let page = 1; page <= 10; page++) {
-      promises.push(
-        api.card.findAllCards({ page, limit: 200 }).catch(err => {
-          console.log(`Page ${page} failed:`, err.message);
-          return { data: { data: [] } };
-        })
-      );
-    }
-    
-    const results = await Promise.all(promises);
-    
     const allCards = [];
-    results.forEach(result => {
-      const cards = result.data.data || [];
-      allCards.push(...cards);
-    });
+    
+    // Fetch 6 pages sequentially to avoid timeout
+    for (let page = 1; page <= 6; page++) {
+      try {
+        const result = await api.card.findAllCards({ page, limit: 200 });
+        const cards = result.data.data || [];
+        
+        if (cards.length === 0) break;
+        allCards.push(...cards);
+        
+        if (cards.length < 200) break;
+      } catch (pageError) {
+        console.error(`Page ${page} error:`, pageError.message);
+        break;
+      }
+    }
     
     const heroMap = new Map();
     
@@ -49,8 +48,7 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Filter out inactive heroes (score = 0)
-      if (expectedScore === 0) continue;
+      if (expectedScore <= 0) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
