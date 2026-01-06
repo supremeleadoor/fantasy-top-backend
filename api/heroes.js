@@ -21,10 +21,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch 5 pages in parallel
+    // Fetch 10 pages to ensure we get all active heroes
     const promises = [];
-    for (let page = 1; page <= 5; page++) {
-      promises.push(api.card.findAllCards({ page, limit: 200 }));
+    for (let page = 1; page <= 10; page++) {
+      promises.push(
+        api.card.findAllCards({ page, limit: 200 }).catch(err => {
+          console.log(`Page ${page} failed:`, err.message);
+          return { data: { data: [] } };
+        })
+      );
     }
     
     const results = await Promise.all(promises);
@@ -36,14 +41,6 @@ export default async function handler(req, res) {
     });
     
     const heroMap = new Map();
-    const stats = {
-      totalCards: allCards.length,
-      uniqueHeroesTotal: 0,
-      filteredByScore: 0,
-      filteredByStatus: 0,
-      filteredByPackable: 0,
-      activeHeroes: 0
-    };
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -52,26 +49,8 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Track unique heroes before filtering
-      if (!heroMap.has(heroId) && expectedScore > 0) {
-        stats.uniqueHeroesTotal++;
-      }
-      
-      // Apply filters and track what gets filtered
-      if (expectedScore === 0) {
-        stats.filteredByScore++;
-        continue;
-      }
-      
-      if (hero.status !== 'HERO') {
-        if (!heroMap.has(heroId)) stats.filteredByStatus++;
-        continue;
-      }
-      
-      if (hero.can_be_packed === false) {
-        if (!heroMap.has(heroId)) stats.filteredByPackable++;
-        continue;
-      }
+      // Filter out inactive heroes (score = 0)
+      if (expectedScore === 0) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -83,7 +62,6 @@ export default async function handler(req, res) {
           expectedScore: expectedScore,
           profileImage: hero.profile_image_url_https || null
         });
-        stats.activeHeroes++;
       }
     }
     
@@ -92,7 +70,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       count: heroes.length,
-      stats: stats,
+      totalCards: allCards.length,
       heroes: heroes
     });
     
