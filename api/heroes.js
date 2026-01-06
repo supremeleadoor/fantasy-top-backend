@@ -23,8 +23,8 @@ export default async function handler(req, res) {
   try {
     const allCards = [];
     
-    // Fetch 6 pages sequentially to avoid timeout
-    for (let page = 1; page <= 6; page++) {
+    // Fetch 8 pages to get comprehensive list
+    for (let page = 1; page <= 8; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     }
     
     const heroMap = new Map();
+    const suspiciousHeroes = []; // Track heroes that might be inactive
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -48,7 +49,21 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
+      // Skip heroes with 0 score
       if (expectedScore <= 0) continue;
+      
+      // Track suspicious heroes (low score but not 0)
+      if (expectedScore > 0 && expectedScore < 100 && !heroMap.has(heroId)) {
+        suspiciousHeroes.push({
+          id: heroId,
+          name: hero.name,
+          handle: hero.handle,
+          score: expectedScore,
+          status: hero.status,
+          can_be_packed: hero.can_be_packed,
+          stars: hero.stars
+        });
+      }
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -58,7 +73,9 @@ export default async function handler(req, res) {
           stars: hero.stars || 0,
           followers: hero.followers_count || 0,
           expectedScore: expectedScore,
-          profileImage: hero.profile_image_url_https || null
+          profileImage: hero.profile_image_url_https || null,
+          status: hero.status || null,
+          canBePacked: hero.can_be_packed || false
         });
       }
     }
@@ -69,7 +86,10 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      heroes: heroes
+      heroes: heroes,
+      debug: {
+        suspiciousHeroes: suspiciousHeroes.slice(0, 20) // Show first 20 low-score heroes
+      }
     });
     
   } catch (error) {
