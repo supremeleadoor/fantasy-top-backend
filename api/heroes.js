@@ -1,4 +1,4 @@
-// api/heroes.js - Using Fantasy.top SDK
+// api/heroes.js - Using Fantasy.top SDK with proper response handling
 import { Client, Configuration } from '@fantasy-top/sdk-pro';
 
 const config = new Configuration({
@@ -24,49 +24,80 @@ export default async function handler(req, res) {
   try {
     console.log('Fetching from Fantasy.top API using SDK...');
     
-    // Use SDK to fetch all cards
+    // Use SDK to fetch all cards with proper parameters
     const result = await api.card.findAllCards({ page: 1, limit: 200 });
     
-    console.log('Processing data...');
+    console.log('SDK call successful, processing data...');
     
-    // Process the response
-    const heroMap = new Map();
-    const cards = result.data || result.results || [];
+    // Extract the actual data from SDK response
+    // SDK returns an object with data property containing the array
+    let cards = [];
+    
+    if (result && typeof result === 'object') {
+      // Try different possible response structures
+      cards = result.data?.data || result.data || result.results || result.cards || [];
+      
+      // If result itself is an array
+      if (Array.isArray(result)) {
+        cards = result;
+      }
+    }
+    
+    console.log(`Found ${Array.isArray(cards) ? cards.length : 0} cards`);
     
     if (!Array.isArray(cards)) {
+      // Return debug info to help us understand the response structure
       return res.status(200).json({
-        success: true,
+        success: false,
         debug: true,
-        message: 'Got response but not in expected array format',
-        rawData: result
+        message: 'Response not in expected format',
+        responseType: typeof result,
+        responseKeys: result ? Object.keys(result) : [],
+        sampleData: result ? JSON.stringify(result).substring(0, 500) : null
       });
     }
     
+    if (cards.length === 0) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        message: 'No cards found',
+        heroes: []
+      });
+    }
+    
+    // Process the cards into hero data
+    const heroMap = new Map();
+    
     cards.forEach(card => {
-      const heroId = card.playerId || card.player_id || card.id;
-      const heroName = card.playerName || card.player_name || card.name;
-      
-      if (!heroId || !heroName) return;
-      
-      if (!heroMap.has(heroId)) {
-        heroMap.set(heroId, {
-          id: heroId,
-          name: heroName,
-          handle: card.playerHandle || card.twitter_handle || card.handle,
-          stars: card.stars || card.rating,
-          rank: card.rank || card.position,
-          followers: card.followers || card.follower_count,
-          score7d: card.score7d || card.weekly_score || card.score,
-          prices: {}
-        });
-      }
-      
-      const hero = heroMap.get(heroId);
-      const rarity = (card.rarity || card.tier || '').toLowerCase();
-      const price = parseFloat(card.price || card.floor_price || 0);
-      
-      if (rarity && price > 0) {
-        hero.prices[rarity] = price;
+      try {
+        const heroId = card.playerId || card.player_id || card.id;
+        const heroName = card.playerName || card.player_name || card.name;
+        
+        if (!heroId || !heroName) return;
+        
+        if (!heroMap.has(heroId)) {
+          heroMap.set(heroId, {
+            id: heroId,
+            name: heroName,
+            handle: card.playerHandle || card.twitter_handle || card.handle || null,
+            stars: card.stars || card.rating || null,
+            rank: card.rank || card.position || null,
+            followers: card.followers || card.follower_count || null,
+            score7d: card.score7d || card.weekly_score || card.score || null,
+            prices: {}
+          });
+        }
+        
+        const hero = heroMap.get(heroId);
+        const rarity = (card.rarity || card.tier || '').toLowerCase();
+        const price = parseFloat(card.price || card.floor_price || 0);
+        
+        if (rarity && price > 0) {
+          hero.prices[rarity] = price;
+        }
+      } catch (err) {
+        console.error('Error processing card:', err.message);
       }
     });
     
@@ -77,6 +108,8 @@ export default async function handler(req, res) {
         commonPrice: hero.prices.common || Math.min(...Object.values(hero.prices))
       }));
     
+    console.log(`Processed ${heroes.length} heroes`);
+    
     res.status(200).json({
       success: true,
       count: heroes.length,
@@ -84,20 +117,18 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-  console.error('Error:', error);
-  
-  // Handle circular reference errors and provide better debugging
-  const errorMessage = error.message || 'Unknown error';
-  const errorDetails = error.response?.data || error.response?.statusText || 'SDK call failed';
-  
-  res.status(500).json({
-    success: false,
-    error: errorMessage,
-    message: 'Failed to fetch data from Fantasy.top API',
-    details: typeof errorDetails === 'string' ? errorDetails : 'Check API configuration',
-    hint: 'The SDK might be installed but the API key or endpoint may be incorrect'
-  });
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack?.substring(0, 200)
+    });
+    
+    res.status(500).json({
+      success: false,
+      error: error.message || 'Unknown error',
+      errorType: error.name || 'Error',
+      message: 'Failed to fetch data from Fantasy.top API',
+      hint: 'Check if API key is valid and SDK is properly configured'
+    });
+  }
 }
-}
-
-
