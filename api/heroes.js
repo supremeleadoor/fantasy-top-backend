@@ -36,6 +36,14 @@ export default async function handler(req, res) {
     });
     
     const heroMap = new Map();
+    const stats = {
+      totalCards: allCards.length,
+      uniqueHeroesTotal: 0,
+      filteredByScore: 0,
+      filteredByStatus: 0,
+      filteredByPackable: 0,
+      activeHeroes: 0
+    };
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -44,13 +52,26 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Filter criteria to match Fantasy.top leaderboard:
-      // 1. Must have expected score > 0
-      // 2. Must have status = "HERO" (active hero)
-      // 3. Must be packable (can_be_packed = true)
-      if (expectedScore === 0) continue;
-      if (hero.status !== 'HERO') continue;
-      if (hero.can_be_packed === false) continue;
+      // Track unique heroes before filtering
+      if (!heroMap.has(heroId) && expectedScore > 0) {
+        stats.uniqueHeroesTotal++;
+      }
+      
+      // Apply filters and track what gets filtered
+      if (expectedScore === 0) {
+        stats.filteredByScore++;
+        continue;
+      }
+      
+      if (hero.status !== 'HERO') {
+        if (!heroMap.has(heroId)) stats.filteredByStatus++;
+        continue;
+      }
+      
+      if (hero.can_be_packed === false) {
+        if (!heroMap.has(heroId)) stats.filteredByPackable++;
+        continue;
+      }
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -60,9 +81,9 @@ export default async function handler(req, res) {
           stars: hero.stars || 0,
           followers: hero.followers_count || 0,
           expectedScore: expectedScore,
-          profileImage: hero.profile_image_url_https || null,
-          status: hero.status
+          profileImage: hero.profile_image_url_https || null
         });
+        stats.activeHeroes++;
       }
     }
     
@@ -71,7 +92,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       success: true,
       count: heroes.length,
-      totalCards: allCards.length,
+      stats: stats,
       heroes: heroes
     });
     
