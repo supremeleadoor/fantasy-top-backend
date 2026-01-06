@@ -40,7 +40,6 @@ export default async function handler(req, res) {
     }
     
     const heroMap = new Map();
-    const suspiciousHeroes = []; // Track heroes that might be inactive
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -49,21 +48,13 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Skip heroes with 0 score
+      // Filter out inactive heroes:
+      // 1. Score must be > 0 (completely inactive)
+      // 2. Status must be "HERO" (not "DELETED" or "CLOUT")
+      // 3. Must be packable (can_be_packed = true)
       if (expectedScore <= 0) continue;
-      
-      // Track suspicious heroes (low score but not 0)
-      if (expectedScore > 0 && expectedScore < 100 && !heroMap.has(heroId)) {
-        suspiciousHeroes.push({
-          id: heroId,
-          name: hero.name,
-          handle: hero.handle,
-          score: expectedScore,
-          status: hero.status,
-          can_be_packed: hero.can_be_packed,
-          stars: hero.stars
-        });
-      }
+      if (hero.status !== 'HERO') continue;
+      if (hero.can_be_packed === false) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -73,9 +64,7 @@ export default async function handler(req, res) {
           stars: hero.stars || 0,
           followers: hero.followers_count || 0,
           expectedScore: expectedScore,
-          profileImage: hero.profile_image_url_https || null,
-          status: hero.status || null,
-          canBePacked: hero.can_be_packed || false
+          profileImage: hero.profile_image_url_https || null
         });
       }
     }
@@ -86,10 +75,7 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      heroes: heroes,
-      debug: {
-        suspiciousHeroes: suspiciousHeroes.slice(0, 20) // Show first 20 low-score heroes
-      }
+      heroes: heroes
     });
     
   } catch (error) {
