@@ -84,14 +84,20 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
-    console.error('Error:', error);
-    
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      message: 'Failed to fetch data from Fantasy.top API',
-      details: 'Make sure the SDK is properly installed and configured'
-    });
-  }
+  console.error('Error:', error);
+  
+  // Handle circular reference errors and provide better debugging
+  const errorMessage = error.message || 'Unknown error';
+  const errorDetails = error.response?.data || error.response?.statusText || 'SDK call failed';
+  
+  res.status(500).json({
+    success: false,
+    error: errorMessage,
+    message: 'Failed to fetch data from Fantasy.top API',
+    details: typeof errorDetails === 'string' ? errorDetails : 'Check API configuration',
+    hint: 'The SDK might be installed but the API key or endpoint may be incorrect'
+  });
 }
+}
+
 
