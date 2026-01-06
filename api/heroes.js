@@ -39,11 +39,6 @@ export default async function handler(req, res) {
     }
     
     const heroMap = new Map();
-    const filteredHeroes = {
-      byScore: [],
-      byStatus: [],
-      byPackable: []
-    };
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -52,44 +47,15 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
+      // Filter criteria - hero must be active:
+      // 1. Status must be "HERO" (not "DELETED" or "CLOUT")
+      // 2. Must be packable (can_be_packed = true)
+      // Note: We DO NOT filter by score, as active heroes can have 0 score temporarily
+      
+      if (hero.status !== 'HERO') continue;
+      if (hero.can_be_packed === false) continue;
+      
       if (!heroMap.has(heroId)) {
-        // Track filtered heroes with details
-        if (expectedScore <= 0) {
-          filteredHeroes.byScore.push({
-            name: hero.name,
-            handle: hero.handle,
-            score: expectedScore,
-            status: hero.status,
-            can_be_packed: hero.can_be_packed
-          });
-          continue;
-        }
-        
-        if (hero.status !== 'HERO') {
-          filteredHeroes.byStatus.push({
-            name: hero.name,
-            handle: hero.handle,
-            score: expectedScore,
-            status: hero.status,
-            can_be_packed: hero.can_be_packed,
-            stars: hero.stars
-          });
-          continue;
-        }
-        
-        if (hero.can_be_packed === false) {
-          filteredHeroes.byPackable.push({
-            name: hero.name,
-            handle: hero.handle,
-            score: expectedScore,
-            status: hero.status,
-            can_be_packed: hero.can_be_packed,
-            stars: hero.stars
-          });
-          continue;
-        }
-        
-        // Active hero
         heroMap.set(heroId, {
           id: heroId,
           name: hero.name || 'Unknown',
@@ -108,14 +74,6 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      filteredOut: {
-        byScore: filteredHeroes.byScore.length,
-        byStatus: filteredHeroes.byStatus.length,
-        byPackable: filteredHeroes.byPackable.length,
-        heroesFilteredByScore: filteredHeroes.byScore,
-        heroesFilteredByStatus: filteredHeroes.byStatus,
-        heroesFilteredByPackable: filteredHeroes.byPackable
-      },
       heroes: heroes
     });
     
