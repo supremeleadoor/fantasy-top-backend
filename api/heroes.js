@@ -21,16 +21,19 @@ export default async function handler(req, res) {
   }
 
   try {
-    // Fetch 3 pages to get more heroes
-    const page1 = await api.card.findAllCards({ page: 1, limit: 200 });
-    const page2 = await api.card.findAllCards({ page: 2, limit: 200 });
-    const page3 = await api.card.findAllCards({ page: 3, limit: 200 });
+    // Fetch 5 pages to get all heroes
+    const promises = [];
+    for (let page = 1; page <= 5; page++) {
+      promises.push(api.card.findAllCards({ page, limit: 200 }));
+    }
     
-    const allCards = [
-      ...(page1.data.data || []),
-      ...(page2.data.data || []),
-      ...(page3.data.data || [])
-    ];
+    const results = await Promise.all(promises);
+    
+    const allCards = [];
+    results.forEach(result => {
+      const cards = result.data.data || [];
+      allCards.push(...cards);
+    });
     
     const heroMap = new Map();
     
