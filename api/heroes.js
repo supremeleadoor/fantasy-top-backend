@@ -1,7 +1,12 @@
-// api/heroes.js - Direct API calls without SDK
+// api/heroes.js - Using Fantasy.top SDK
+import { Client, Configuration } from '@fantasy-top/sdk-pro';
 
-const FANTASY_API_KEY = 'f341037c-8d9a-476a-9a10-9c484e4cb01f';
-const API_BASE = 'https://api-v2.fantasy.top';
+const config = new Configuration({
+  basePath: 'https://api-v2.fantasy.top',
+  apiKey: 'f341037c-8d9a-476a-9a10-9c484e4cb01f'
+});
+
+const api = Client.getInstance(config);
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -12,70 +17,28 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   try {
-    console.log('Fetching from Fantasy.top API...');
+    console.log('Fetching from Fantasy.top API using SDK...');
     
-    // Try multiple possible endpoints with different methods
-    const endpoints = [
-      { url: `${API_BASE}/card/findAllCards?page=1&limit=200`, method: 'GET' },
-      { url: `${API_BASE}/cards?page=1&limit=200`, method: 'GET' },
-      { url: `${API_BASE}/api/card/findAllCards`, method: 'GET' },
-      { url: `${API_BASE}/api/cards/all`, method: 'GET' },
-    ];
-    
-    let data = null;
-    let successEndpoint = null;
-    let lastError = null;
-    
-    for (const endpoint of endpoints) {
-      try {
-        console.log(`Trying: ${endpoint.method} ${endpoint.url}`);
-        
-        const response = await fetch(endpoint.url, {
-          method: endpoint.method,
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': FANTASY_API_KEY,
-            'Authorization': `Bearer ${FANTASY_API_KEY}`
-          }
-        });
-        
-        console.log(`Response status: ${response.status}`);
-        
-        if (response.ok) {
-          data = await response.json();
-          successEndpoint = endpoint.url;
-          console.log('Success!');
-          break;
-        } else {
-          const errorText = await response.text();
-          console.log(`Failed: ${response.status} - ${errorText}`);
-          lastError = `${response.status}: ${errorText}`;
-        }
-      } catch (err) {
-        console.log(`Error: ${err.message}`);
-        lastError = err.message;
-        continue;
-      }
-    }
-    
-    if (!data) {
-      throw new Error(`All endpoints failed. Last error: ${lastError}. The API might require different authentication or the SDK must be used.`);
-    }
+    // Use SDK to fetch all cards
+    const result = await api.card.findAllCards(1, 200);
     
     console.log('Processing data...');
     
     // Process the response
     const heroMap = new Map();
-    const cards = data.data || data.cards || data.results || data || [];
+    const cards = result.data || result.results || [];
     
     if (!Array.isArray(cards)) {
       return res.status(200).json({
         success: true,
         debug: true,
         message: 'Got response but not in expected array format',
-        endpoint: successEndpoint,
-        rawData: data
+        rawData: result
       });
     }
     
@@ -117,18 +80,17 @@ export default async function handler(req, res) {
     res.status(200).json({
       success: true,
       count: heroes.length,
-      endpoint: successEndpoint,
       heroes: heroes
     });
     
   } catch (error) {
-    console.error('Final error:', error);
+    console.error('Error:', error);
     
     res.status(500).json({
       success: false,
       error: error.message,
       message: 'Failed to fetch data from Fantasy.top API',
-      suggestion: 'The API might require the SDK to be run client-side, or needs different authentication'
+      details: 'Make sure the SDK is properly installed and configured'
     });
   }
 }
