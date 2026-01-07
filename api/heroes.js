@@ -68,4 +68,57 @@ export default async function handler(req, res) {
       if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
-        heroMap.set(her
+        heroMap.set(heroId, {
+          id: heroId,
+          name: hero.name || 'Unknown',
+          handle: hero.handle || null,
+          stars: hero.stars || 0,
+          followers: hero.followers_count || 0,
+          expectedScore: expectedScore,
+          profileImage: hero.profile_image_url_https || null
+        });
+      }
+    }
+    
+    const heroes = Array.from(heroMap.values());
+    
+    // Group heroes by status for debugging
+    const byStatus = {
+      HERO: [],
+      DELETED: [],
+      CLOUT: [],
+      OTHER: []
+    };
+    
+    heroStatuses.forEach(h => {
+      if (h.status === 'HERO') byStatus.HERO.push(h);
+      else if (h.status === 'DELETED') byStatus.DELETED.push(h);
+      else if (h.status === 'CLOUT') byStatus.CLOUT.push(h);
+      else byStatus.OTHER.push(h);
+    });
+    
+    return res.status(200).json({
+      success: true,
+      count: heroes.length,
+      totalCards: allCards.length,
+      debug: {
+        statusCounts: statusCounts,
+        uniqueHeroesByStatus: {
+          HERO: byStatus.HERO.length,
+          DELETED: byStatus.DELETED.length,
+          CLOUT: byStatus.CLOUT.length,
+          OTHER: byStatus.OTHER.length
+        },
+        sampleCLOUT: byStatus.CLOUT.slice(0, 20),
+        sampleOTHER: byStatus.OTHER
+      },
+      heroes: heroes
+    });
+    
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+}
