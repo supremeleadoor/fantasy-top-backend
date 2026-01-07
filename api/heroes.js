@@ -4,7 +4,12 @@ const config = new Configuration({
   apiKey: 'f341037c-8d9a-476a-9a10-9c484e4cb01f'
 });
 const api = Client.getInstance(config);
+
 export default async function handler(req, res) {
+  // Disable caching completely
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -18,8 +23,8 @@ export default async function handler(req, res) {
   try {
     const allCards = [];
     
-    // Fetch 10 pages to ensure we get all heroes
-    for (let page = 1; page <= 10; page++) {
+    // Fetch MORE pages to get newer heroes
+    for (let page = 1; page <= 20; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
