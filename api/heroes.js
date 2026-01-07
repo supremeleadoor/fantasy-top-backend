@@ -1,33 +1,41 @@
 import { Client, Configuration } from '@fantasy-top/sdk-pro';
 
-const config = new Configuration({
+export const config = {
+  runtime: 'edge',
+};
+
+const sdkConfig = new Configuration({
   basePath: 'https://api-v2.fantasy.top',
   apiKey: 'f341037c-8d9a-476a-9a10-9c484e4cb01f'
 });
-const api = Client.getInstance(config);
+const api = Client.getInstance(sdkConfig);
 
-export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '-1');
-  res.setHeader('Surrogate-Control', 'no-store');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  
+export default async function handler(req) {
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Cache-Control': 'no-store, no-cache, must-revalidate',
+  };
+
   if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+    return new Response(null, { status: 200, headers });
   }
+  
   if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return new Response(
+      JSON.stringify({ error: 'Method not allowed' }), 
+      { status: 405, headers }
+    );
   }
   
   try {
     const allCards = [];
     const fetchTimestamp = new Date().toISOString();
     
-    // Fetch 30 pages
-    for (let page = 1; page <= 50; page++) {
+    // Fetch 75 pages with edge runtime's 60s timeout
+    for (let page = 1; page <= 75; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -75,22 +83,26 @@ export default async function handler(req, res) {
     
     const heroes = Array.from(heroMap.values());
     
-    return res.status(200).json({
-      success: true,
-      count: heroes.length,
-      totalCards: allCards.length,
-      allStatusesFound: Array.from(allStatuses),
-      statusCounts: statusCounts,
-      fetchedAt: fetchTimestamp,
-      heroes: heroes
-    });
+    return new Response(
+      JSON.stringify({
+        success: true,
+        count: heroes.length,
+        totalCards: allCards.length,
+        allStatusesFound: Array.from(allStatuses),
+        statusCounts: statusCounts,
+        fetchedAt: fetchTimestamp,
+        heroes: heroes
+      }),
+      { status: 200, headers }
+    );
     
   } catch (error) {
-    return res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
+      { status: 500, headers }
+    );
   }
 }
-
-
