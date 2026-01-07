@@ -33,7 +33,7 @@ export default async function handler(req) {
   try {
     const url = new URL(req.url);
     const startPage = parseInt(url.searchParams.get('startPage')) || 1;
-    const maxPages = parseInt(url.searchParams.get('maxPages')) || 40;
+    const maxPages = parseInt(url.searchParams.get('maxPages')) || 25;
     
     const allCards = [];
     
@@ -88,6 +88,7 @@ export default async function handler(req) {
         totalCards: allCards.length,
         pageRange: `${startPage}-${startPage + maxPages - 1}`,
         statusCounts: statusCounts,
+        fetchedAt: new Date().toISOString(),
         heroes: heroes
       }),
       { status: 200, headers }
