@@ -6,12 +6,10 @@ const config = new Configuration({
 });
 const api = Client.getInstance(config);
 
-// Cache variables
-let cachedHeroes = null;
-let lastFetchTime = 0;
-const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
-
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -24,23 +22,10 @@ export default async function handler(req, res) {
   }
   
   try {
-    const now = Date.now();
-    
-    // Return cached data if fresh
-    if (cachedHeroes && (now - lastFetchTime) < CACHE_DURATION) {
-      return res.status(200).json({
-        success: true,
-        count: cachedHeroes.length,
-        cached: true,
-        cacheAge: Math.floor((now - lastFetchTime) / 1000),
-        heroes: cachedHeroes
-      });
-    }
-    
     const allCards = [];
     
-    // Start with 75 pages - increase if needed
-    for (let page = 1; page <= 75; page++) {
+    // Fetch 50 pages
+    for (let page = 1; page <= 50; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -64,6 +49,7 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
+      // Only include heroes with status "HERO"
       if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
@@ -81,15 +67,10 @@ export default async function handler(req, res) {
     
     const heroes = Array.from(heroMap.values());
     
-    // Update cache
-    cachedHeroes = heroes;
-    lastFetchTime = now;
-    
     return res.status(200).json({
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      cached: false,
       heroes: heroes
     });
     
