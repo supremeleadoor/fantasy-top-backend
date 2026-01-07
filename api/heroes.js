@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const fetchTimestamp = new Date().toISOString();
     
     // Fetch 20 pages to avoid timeout
-    for (let page = 1; page <= 20; page++) {
+    for (let page = 1; page <= 25; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -105,3 +105,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
