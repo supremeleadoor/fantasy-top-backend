@@ -7,9 +7,10 @@ const config = new Configuration({
 const api = Client.getInstance(config);
 
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
   res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
+  res.setHeader('Expires', '-1');
+  res.setHeader('Surrogate-Control', 'no-store');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -23,9 +24,10 @@ export default async function handler(req, res) {
   
   try {
     const allCards = [];
+    const fetchTimestamp = new Date().toISOString();
     
-    // Fetch 50 pages
-    for (let page = 1; page <= 50; page++) {
+    // Fetch 20 pages to avoid timeout
+    for (let page = 1; page <= 20; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -41,6 +43,8 @@ export default async function handler(req, res) {
     }
     
     const heroMap = new Map();
+    const statusCounts = {};
+    const allStatuses = new Set();
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -48,6 +52,10 @@ export default async function handler(req, res) {
       const hero = card.heroes;
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
+      
+      // Track all statuses
+      allStatuses.add(hero.status);
+      statusCounts[hero.status] = (statusCounts[hero.status] || 0) + 1;
       
       // Only include heroes with status "HERO"
       if (hero.status !== 'HERO') continue;
@@ -71,6 +79,9 @@ export default async function handler(req, res) {
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
+      allStatusesFound: Array.from(allStatuses),
+      statusCounts: statusCounts,
+      fetchedAt: fetchTimestamp,
       heroes: heroes
     });
     
