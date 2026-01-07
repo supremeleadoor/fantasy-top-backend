@@ -33,7 +33,7 @@ export default async function handler(req) {
   try {
     const url = new URL(req.url);
     const startPage = parseInt(url.searchParams.get('startPage')) || 1;
-    const maxPages = parseInt(url.searchParams.get('maxPages')) || 20; // Reduced to 20
+    const maxPages = parseInt(url.searchParams.get('maxPages')) || 10; // Reduced to 10
     
     const allCards = [];
     
