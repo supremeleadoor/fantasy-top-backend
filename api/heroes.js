@@ -23,7 +23,8 @@ export default async function handler(req, res) {
   try {
     const allCards = [];
     
-    for (let page = 1; page <= 8; page++) {
+    // Fetch 10 pages to ensure we get all heroes
+    for (let page = 1; page <= 10; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -39,8 +40,6 @@ export default async function handler(req, res) {
     }
     
     const heroMap = new Map();
-    const statusCounts = {};
-    const heroStatuses = [];
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -48,23 +47,8 @@ export default async function handler(req, res) {
       const hero = card.heroes;
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
-      const status = hero.status || 'UNKNOWN';
       
-      // Count status types
-      statusCounts[status] = (statusCounts[status] || 0) + 1;
-      
-      // Track unique heroes by status
-      if (!heroMap.has(heroId)) {
-        heroStatuses.push({
-          name: hero.name,
-          handle: hero.handle,
-          status: status,
-          score: expectedScore,
-          can_be_packed: hero.can_be_packed
-        });
-      }
-      
-      // Include only HERO status for now
+      // Only include heroes with status "HERO"
       if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
@@ -82,36 +66,10 @@ export default async function handler(req, res) {
     
     const heroes = Array.from(heroMap.values());
     
-    // Group heroes by status for debugging
-    const byStatus = {
-      HERO: [],
-      DELETED: [],
-      CLOUT: [],
-      OTHER: []
-    };
-    
-    heroStatuses.forEach(h => {
-      if (h.status === 'HERO') byStatus.HERO.push(h);
-      else if (h.status === 'DELETED') byStatus.DELETED.push(h);
-      else if (h.status === 'CLOUT') byStatus.CLOUT.push(h);
-      else byStatus.OTHER.push(h);
-    });
-    
     return res.status(200).json({
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
-      debug: {
-        statusCounts: statusCounts,
-        uniqueHeroesByStatus: {
-          HERO: byStatus.HERO.length,
-          DELETED: byStatus.DELETED.length,
-          CLOUT: byStatus.CLOUT.length,
-          OTHER: byStatus.OTHER.length
-        },
-        sampleCLOUT: byStatus.CLOUT.slice(0, 20),
-        sampleOTHER: byStatus.OTHER
-      },
       heroes: heroes
     });
     
