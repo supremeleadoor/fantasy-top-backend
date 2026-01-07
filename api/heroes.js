@@ -26,8 +26,8 @@ export default async function handler(req, res) {
     const allCards = [];
     const fetchTimestamp = new Date().toISOString();
     
-    // Fetch 20 pages to avoid timeout
-    for (let page = 1; page <= 25; page++) {
+    // Fetch 30 pages
+    for (let page = 1; page <= 30; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -45,7 +45,6 @@ export default async function handler(req, res) {
     const heroMap = new Map();
     const statusCounts = {};
     const allStatuses = new Set();
-    const sampleCloutCards = []; // Track CLOUT status heroes
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -57,17 +56,6 @@ export default async function handler(req, res) {
       // Track all statuses
       allStatuses.add(hero.status);
       statusCounts[hero.status] = (statusCounts[hero.status] || 0) + 1;
-      
-      // Save sample CLOUT heroes for debugging
-      if (hero.status === 'CLOUT' && sampleCloutCards.length < 20) {
-        sampleCloutCards.push({
-          name: hero.name,
-          handle: hero.handle,
-          status: hero.status,
-          stars: hero.stars,
-          followers: hero.followers_count
-        });
-      }
       
       // Only include heroes with status "HERO"
       if (hero.status !== 'HERO') continue;
@@ -93,7 +81,6 @@ export default async function handler(req, res) {
       totalCards: allCards.length,
       allStatusesFound: Array.from(allStatuses),
       statusCounts: statusCounts,
-      sampleCloutCards: sampleCloutCards,
       fetchedAt: fetchTimestamp,
       heroes: heroes
     });
@@ -105,4 +92,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
