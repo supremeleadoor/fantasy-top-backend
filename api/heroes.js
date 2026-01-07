@@ -16,7 +16,7 @@ export default async function handler(req) {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Cache-Control': 'no-store, no-cache, must-revalidate',
+    'Cache-Control': 'no-store',
   };
 
   if (req.method === 'OPTIONS') {
@@ -31,11 +31,13 @@ export default async function handler(req) {
   }
   
   try {
-    const allCards = [];
-    const fetchTimestamp = new Date().toISOString();
+    const url = new URL(req.url);
+    const startPage = parseInt(url.searchParams.get('startPage')) || 1;
+    const maxPages = parseInt(url.searchParams.get('maxPages')) || 40;
     
-    // Fetch 75 pages with edge runtime's 60s timeout
-    for (let page = 1; page <= 75; page++) {
+    const allCards = [];
+    
+    for (let page = startPage; page <= startPage + maxPages - 1; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
@@ -52,7 +54,6 @@ export default async function handler(req) {
     
     const heroMap = new Map();
     const statusCounts = {};
-    const allStatuses = new Set();
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -61,11 +62,8 @@ export default async function handler(req) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Track all statuses
-      allStatuses.add(hero.status);
       statusCounts[hero.status] = (statusCounts[hero.status] || 0) + 1;
       
-      // Only include heroes with status "HERO"
       if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
@@ -88,9 +86,8 @@ export default async function handler(req) {
         success: true,
         count: heroes.length,
         totalCards: allCards.length,
-        allStatusesFound: Array.from(allStatuses),
+        pageRange: `${startPage}-${startPage + maxPages - 1}`,
         statusCounts: statusCounts,
-        fetchedAt: fetchTimestamp,
         heroes: heroes
       }),
       { status: 200, headers }
