@@ -47,13 +47,9 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
-      // Filter criteria - hero must be active:
-      // 1. Status must be "HERO" (not "DELETED" or "CLOUT")
-      // 2. Must be packable (can_be_packed = true)
-      // Note: We DO NOT filter by score, as active heroes can have 0 score temporarily
-      
+      // Only filter: Status must be "HERO"
+      // This excludes DELETED and CLOUT heroes
       if (hero.status !== 'HERO') continue;
-      if (hero.can_be_packed === false) continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
