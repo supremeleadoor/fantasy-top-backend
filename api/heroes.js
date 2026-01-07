@@ -49,7 +49,7 @@ export default async function handler(req, res) {
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
       // Only include heroes with status "HERO"
-      if (hero.status !== 'HERO') continue;
+      //if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -80,3 +80,4 @@ export default async function handler(req, res) {
     });
   }
 }
+
