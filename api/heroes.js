@@ -1,12 +1,3 @@
-import { Client, Configuration } from '@fantasy-top/sdk-pro';
-
-const config = new Configuration({
-  basePath: 'https://api-v2.fantasy.top',
-  apiKey: 'f341037c-8d9a-476a-9a10-9c484e4cb01f'
-});
-
-const api = Client.getInstance(config);
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
@@ -15,19 +6,19 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
-
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-
   try {
     const allCards = [];
     
-    // Fetch 10 pages to ensure we get all heroes
-    for (let page = 1; page <= 10; page++) {
+    // Fetch more pages to be safe
+    for (let page = 1; page <= 15; page++) {
       try {
         const result = await api.card.findAllCards({ page, limit: 200 });
         const cards = result.data.data || [];
+        
+        console.log(`Page ${page}: ${cards.length} cards`);
         
         if (cards.length === 0) break;
         allCards.push(...cards);
@@ -39,7 +30,10 @@ export default async function handler(req, res) {
       }
     }
     
+    console.log(`Total cards fetched: ${allCards.length}`);
+    
     const heroMap = new Map();
+    const statusCounts = {};
     
     for (const card of allCards) {
       if (!card || !card.heroes || !card.heroes.id) continue;
@@ -48,8 +42,11 @@ export default async function handler(req, res) {
       const heroId = String(hero.id);
       const expectedScore = parseFloat(hero.expected_score) || 0;
       
+      // Count statuses for debugging
+      statusCounts[hero.status] = (statusCounts[hero.status] || 0) + 1;
+      
       // Only include heroes with status "HERO"
-      //if (hero.status !== 'HERO') continue;
+      if (hero.status !== 'HERO') continue;
       
       if (!heroMap.has(heroId)) {
         heroMap.set(heroId, {
@@ -66,10 +63,14 @@ export default async function handler(req, res) {
     
     const heroes = Array.from(heroMap.values());
     
+    console.log('Status counts:', statusCounts);
+    console.log(`Unique heroes with HERO status: ${heroes.length}`);
+    
     return res.status(200).json({
       success: true,
       count: heroes.length,
       totalCards: allCards.length,
+      statusCounts: statusCounts,
       heroes: heroes
     });
     
@@ -80,4 +81,3 @@ export default async function handler(req, res) {
     });
   }
 }
-
